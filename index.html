@@ -74,6 +74,44 @@
   .ai-toggle input { cursor: pointer; }
   .top-bar .right { display: flex; align-items: center; gap: 12px; pointer-events: none; }
   .top-bar .right > * { pointer-events: auto; }
+  .controls button, #new-game, .ai-toggle { touch-action: manipulation; }
+
+  @media (max-width: 600px) {
+    .top-bar {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 6px;
+      padding: 8px 10px;
+    }
+    .top-bar .right { justify-content: space-between; }
+    #status { font-size: 14px; line-height: 1.25; }
+    .ai-toggle { font-size: 12px; padding: 4px 6px; gap: 4px; }
+    #new-game { font-size: 12px; padding: 6px 10px; }
+    .controls { padding: 8px 6px; gap: 4px; }
+    .controls .row { gap: 4px; }
+    .controls button {
+      min-width: 44px;
+      padding: 9px 6px;
+      font-size: 13px;
+    }
+    .controls .label { font-size: 10px; line-height: 1.3; }
+  }
+
+  @media (max-height: 500px) {
+    .top-bar { padding: 6px 10px; flex-direction: row; }
+    .top-bar .right { gap: 8px; }
+    #status { font-size: 13px; line-height: 1.2; }
+    .ai-toggle { font-size: 11px; padding: 3px 6px; gap: 4px; }
+    #new-game { font-size: 11px; padding: 5px 8px; }
+    .controls { padding: 6px 4px; gap: 3px; }
+    .controls .row { gap: 3px; }
+    .controls button {
+      min-width: 38px;
+      padding: 5px 5px;
+      font-size: 11px;
+    }
+    .controls .label { display: none; }
+  }
 </style>
 </head>
 <body>
@@ -164,11 +202,42 @@ controls.enablePan = false;
 controls.minDistance = 5;
 controls.maxDistance = 18;
 
+function fitCamera() {
+  const w = innerWidth, h = innerHeight;
+  const isShort = h < 500;
+  const isMobile = w < 600;
+  const topUI = isShort ? 44 : (isMobile ? 78 : 60);
+  const bottomUI = isShort ? 88 : (isMobile ? 170 : 145);
+  const visibleH = Math.max(120, h - topUI - bottomUI);
+
+  const cubeRadius = 2.6;
+  const fovRad = camera.fov * Math.PI / 180;
+  const tanHalfV = Math.tan(fovRad / 2);
+
+  const dV = cubeRadius * h / (visibleH * tanHalfV);
+  const dH = cubeRadius * h / (w * tanHalfV);
+  const targetD = Math.max(dV, dH) * 1.18;
+
+  let dir = camera.position.clone();
+  if (dir.length() < 0.01) dir.set(5.5, 5.5, 7.5);
+  dir.normalize().multiplyScalar(targetD);
+  camera.position.copy(dir);
+
+  const visibleCenter = topUI + visibleH / 2;
+  const pxOffset = visibleCenter - h / 2;
+  const worldH = 2 * targetD * tanHalfV;
+  controls.target.set(0, (pxOffset / h) * worldH, 0);
+  controls.minDistance = targetD * 0.55;
+  controls.maxDistance = targetD * 2.5;
+  controls.update();
+}
+
 function resize() {
   const w = innerWidth, h = innerHeight;
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
+  fitCamera();
 }
 resize();
 addEventListener('resize', resize);
