@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-A single-file browser game that fuses a 3x3 Rubik's Cube with Tic-Tac-Toe. The entire game lives in `index.html`: HTML + inline CSS + an inline ES module that imports Three.js from CDN via an `importmap`. There is no build, no `package.json`, no tests, no lint config. To run, open `index.html` in a modern browser — it loads in the Launch preview panel automatically when edited.
+A single-file browser game that fuses a 3x3 Rubik's Cube with Tic-Tac-Toe. The entire game lives in `index.html`: HTML + inline CSS + an inline ES module that imports Three.js from CDN via an `importmap`. There is no build, no `package.json`, no tests, no lint config.
+
+GitHub repo: `https://github.com/mahnik3428/rubiks-tic-tac-toe`
 
 ## Game rules (drives the architecture)
 
@@ -46,8 +48,47 @@ AI is auto-triggered from `placeMark` (when the *rotator* is AI) and from `doMov
 - After programmatically setting `position` / `quaternion`, call `cubeRoot.updateMatrixWorld(true)` before any `getWorld*` reads. The animator and AI sim both rely on this.
 - Hover hints (`arrowMeshes`) use `depthTest: false` and `renderOrder: 999` so they're visible from any camera angle. Don't "fix" this.
 
+## Mobile responsiveness
+
+**`fitCamera()`** runs on startup and on every `resize` event. It computes how much of the viewport is actually visible between the top bar and the bottom button tray, then sets camera distance and `controls.target.y` so the cube fills and centers that region:
+
+```
+topUI    = height of the top overlay in px  (varies by breakpoint)
+bottomUI = height of the bottom overlay in px
+visibleH = innerHeight - topUI - bottomUI   (clamped to ≥ 120)
+cubeRadius = 2.6
+dV = cubeRadius * innerHeight / (visibleH * tan(fov/2))   // distance to fit vertically
+dH = cubeRadius * innerHeight / (innerWidth * tan(fov/2))  // distance to fit horizontally
+targetD = max(dV, dH) * 1.18
+controls.target.y = (pxOffset / innerHeight) * worldH      // shift orbit target up/down
+```
+
+If you change the top/bottom UI heights (e.g. add a new row of buttons), update the `topUI`/`bottomUI` constants inside `fitCamera` for each relevant breakpoint or the cube will drift out of center.
+
+**CSS breakpoints:**
+- `@media (max-width: 600px)` — portrait mobile: stacks the top-bar content vertically, reduces button size, compacts control strip.
+- `@media (max-height: 500px)` — landscape phones: makes the top bar a single compact row, hides the "Player" label text, compacts the button panel.
+
+**Touch:** All interactive elements (`button`, `.toggle`, `#new-game`) carry `touch-action: manipulation` to eliminate the 300 ms iOS double-tap delay. The canvas itself does not need this because OrbitControls handles touch natively.
+
+## Local dev server
+
+`.claude/launch.json` configures a local static server:
+
+```json
+{ "name": "rubiks-ttt", "runtimeExecutable": "npx",
+  "runtimeArgs": ["--yes", "http-server", "-p", "8765", "-c-1", "--silent"],
+  "port": 8765 }
+```
+
+This is used by the Claude Preview MCP (`preview_start("rubiks-ttt")`) for screenshot-based UI testing. You can also run `npx --yes http-server -p 8765 -c-1` manually and open `http://localhost:8765`.
+
 ## Run / verify
 
-- Open `index.html` in any modern browser, or rely on the Launch preview panel while editing.
-- No automated tests. Verification is manual via the preview: place a mark, confirm the active cubie glows orange and only 6 buttons are enabled, hover a button to see the cyan layer + arrow hint, then trigger the rotation and watch the win check fire after the animation.
+- Open `index.html` in any modern browser, or use the Launch preview panel / local dev server (see above).
+- No automated tests. Verification is manual:
+  - **Desktop**: place a mark, confirm the active cubie glows orange and only 6 buttons are enabled, hover a button to see the cyan layer + arrow hint, trigger the rotation, watch win check fire after animation.
+  - **Mobile portrait** (`max-width: 600px`): cube should fill the space between the top bar and button strip; no scrolling needed.
+  - **Mobile landscape** (`max-height: 500px`): top bar compacts to a single row; buttons remain reachable; cube stays centered in the remaining vertical space.
+  - **Touch**: a finger tap should place a mark; a finger drag should orbit the cube, not place.
 - Toggling **AI opponent (Player 2)** in the top-right makes the AI play both roles for Player 2 (rotates after the human places, then places, then waits for the human to rotate).
